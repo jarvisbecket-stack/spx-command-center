@@ -489,7 +489,7 @@ Awaiting action...</div>
 (function() {
   const PASS_KEY = 'spxbot_auth';
   const CORRECT  = 'jarvis';
-  if (sessionStorage.getItem(PASS_KEY) === '1') return; // already authed
+  if (window.__spxAuthed) return; // already authed this session
 
   // Build lock screen
   const lock = document.createElement('div');
@@ -528,7 +528,7 @@ Awaiting action...</div>
   function tryAuth() {
     const val = document.getElementById('lock-input').value;
     if (val === CORRECT) {
-      sessionStorage.setItem(PASS_KEY, '1');
+      window.__spxAuthed = true;
       document.getElementById('lock-screen').remove();
     } else {
       const err = document.getElementById('lock-err');
