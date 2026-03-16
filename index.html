@@ -648,17 +648,26 @@ const SNAPSHOT_TIME = "2026-03-15T23:03Z";
 
 // Override fetch for API calls — use snapshot when backend unreachable
 const _origFetch = window.fetch;
+function snapshotResponse(url) {
+  console.warn('API unreachable, using snapshot:', url);
+  if (url.includes('/api/status')) {
+    return new Response(JSON.stringify(SNAPSHOT), {status:200, headers:{'Content-Type':'application/json'}});
+  }
+  if (url.includes('/api/trades')) {
+    return new Response(JSON.stringify(SNAPSHOT_TRADES), {status:200, headers:{'Content-Type':'application/json'}});
+  }
+  return new Response(JSON.stringify({status:'offline'}), {status:200, headers:{'Content-Type':'application/json'}});
+}
 window.fetch = function(url, opts) {
   if (typeof url === 'string' && url.includes('/api/')) {
-    return _origFetch(url, opts).catch(function(err) {
-      console.warn('API unreachable, using snapshot:', url);
-      if (url.includes('/api/status')) {
-        return new Response(JSON.stringify(SNAPSHOT), {status:200, headers:{'Content-Type':'application/json'}});
-      }
-      if (url.includes('/api/trades')) {
-        return new Response(JSON.stringify(SNAPSHOT_TRADES), {status:200, headers:{'Content-Type':'application/json'}});
-      }
-      return new Response(JSON.stringify({status:'offline'}), {status:200, headers:{'Content-Type':'application/json'}});
+    return _origFetch(url, opts).then(function(resp) {
+      // If backend returned non-JSON (e.g. GitHub Pages 404 HTML), fall back to snapshot
+      if (!resp.ok) return snapshotResponse(url);
+      var ct = resp.headers.get('content-type') || '';
+      if (!ct.includes('application/json')) return snapshotResponse(url);
+      return resp;
+    }).catch(function(err) {
+      return snapshotResponse(url);
     });
   }
   return _origFetch(url, opts);
@@ -948,8 +957,8 @@ async function refresh() {
     renderHistory(status.closed_trades);
     if (recs) renderRecommendations(recs.recommendations);
 
-    el('last-update-time').textContent = new Date().toLocaleTimeString();
-    el('bot-status').textContent = 'LIVE';
+    el('last-update-time').textContent = 'Snapshot: ' + SNAPSHOT_TIME;
+    el('bot-status').textContent = 'SNAPSHOT';
   } catch (e) {
     console.error(e);
     el('bot-status').textContent = 'ERROR';
